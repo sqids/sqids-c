@@ -1,0 +1,21 @@
+# root
+root = true
+
+# all files: unix newline, final newline, 4 spaces, no tabs, trim whitespaces
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# makefiles: 1 tab
+[{Makefile,Makefile.in,Makefile.am}]
+indent_size = 4
+indent_style = tab
+
+# shell scripts & m4 files: 2 spaces
+[{configure,*.sh,*.ac,*.m4}]
+indent_size = 2
+indent_style = space

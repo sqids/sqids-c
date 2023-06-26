@@ -1,0 +1,50 @@
+# MacOS X
+.DS_Store
+._.*
+*.dSYM
+
+# IDEs
+/.vscode
+
+# Object files, libraries, backups, logs
+*.o
+*.a
+*.la
+*.lo
+*.so
+*~
+*.bak
+*.log
+
+# Binaries
+/src/sqids
+/src/test_str
+/src/test_bl
+/src/test_shuffle
+/src/test_sqids
+
+# Autotools and other stuff
+.deps/
+.libs/
+*.trs
+stamp-h1
+configure
+Makefile
+Makefile.in
+config.h
+config.h.in
+config.log
+config.status
+libtool
+
+# More autotools
+/aclocal.m4
+/m4/libtool.m4
+/m4/lt*.m4
+/autom4te.cache/
+/config/
+
+# Just in case
+/tmp/
+/build/
+/misc/
