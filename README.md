@@ -238,19 +238,65 @@ A command-line utility is provided so one can easily encode/decode hashes and ex
 
 ## Examples
 
-A very minimalistic example:
+Simple encode & decode:
 
 ``` c
 #include <sqids.h>
 
 sqids_t *sqids = sqids_new(SQIDS_DEFAULT_ALPHABET, 0, sqids_bl_list_all(NULL));
-char *hash;
 
-unsigned long long nums1 = {1, 3, 3, 7};
-hash = sqids_encode(sqids, 4, nums1);       // => wFfQJbnS
-sqids_decode(sqids, hash, nums1, 4);        // => 4
+unsigned long long nums[] = {1, 2, 3};
+char *hash = sqids_encode(sqids, 3, nums);  // => "86Rf07"
+sqids_decode(sqids, hash, nums, 3);         // => 3
+
 sqids_mem_free(hash);
+sqids_free(sqids);
+```
 
+Enforce a minimum length:
+
+``` c
+#include <sqids.h>
+
+sqids_t *sqids = sqids_new(SQIDS_DEFAULT_ALPHABET, 10, sqids_bl_list_all(NULL));
+
+unsigned long long nums[] = {1, 2, 3};
+char *hash = sqids_encode(sqids, 3, nums);  // => "86Rf07xd4z"
+sqids_decode(sqids, hash, nums, 3);         // => 3
+
+sqids_mem_free(hash);
+sqids_free(sqids);
+```
+
+Using a custom alphabet will produce different results:
+
+``` c
+#include <sqids.h>
+
+sqids_t *sqids = sqids_new("FxnXM1kBN6cuhsAvjW3Co7l2RePyY8DwaU04Tzt9fHQrqSVKdpimLGIJOgb5ZE", 0, sqids_bl_list_all(NULL));
+
+unsigned long long nums[] = {1, 2, 3};
+char *hash = sqids_encode(sqids, 3, nums);  // => "B4aajs"
+sqids_decode(sqids, hash, nums, 3);         // => 3
+
+sqids_mem_free(hash);
+sqids_free(sqids);
+```
+
+Custom blocklist is just as simple:
+
+``` c
+#include <sqids.h>
+
+sqids_bl_list_t *bl = sqids_bl_list_new(NULL);
+sqids_bl_add_tail(bl, "86Rf07");
+sqids_t *sqids = sqids_new(SQIDS_DEFAULT_ALPHABET, 0, bl);
+
+unsigned long long nums[] = {1, 2, 3};
+char *hash = sqids_encode(sqids, 3, nums);  // => "se8ojk"
+sqids_decode(sqids, hash, nums, 3);         // => 3
+
+sqids_mem_free(hash);
 sqids_free(sqids);
 ```
 
