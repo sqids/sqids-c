@@ -75,14 +75,14 @@ sqids_sqids_test_t sqids_sqids_tests[] = {
     {NULL, 0, 0, {}, NULL, 0},
 };
 
-char *sqids_sqids_failures[lengthof(sqids_sqids_tests) + 1] = {};
+char *sqids_sqids_failures[lengthof(sqids_sqids_tests) + 2] = {};
 
 int
 main(int argc, char **argv)
 {
     int i, j;
     sqids_sqids_test_t *test;
-    sqids_bl_list_t *bl;
+    sqids_bl_t *bl;
     sqids_t *sqids;
     char *enc, *err;
 
@@ -124,7 +124,7 @@ main(int argc, char **argv)
     }
 
     /* test edge case where all the possibilities are blocked */
-    bl = sqids_bl_list_new(sqids_bl_match_func);
+    bl = sqids_bl_new(sqids_bl_match);
     sqids_bl_add_tail(bl, "abc");
     sqids_bl_add_tail(bl, "bca");
     sqids_bl_add_tail(bl, "cab");
@@ -148,6 +148,20 @@ main(int argc, char **argv)
         free(enc);
     }
     sqids_free(sqids);
+
+    if (sqids_errno != SQIDS_ERR_MAX_RETRIES) {
+        (void)asprintf(
+            &err,
+            "%s:%d: "
+            "sqids_encode(...) -> sqids_errno\n"
+            "  expected: %d,\n"
+            "       got: %d\n",
+            __FILE__,
+            __LINE__,
+            SQIDS_ERR_MAX_RETRIES,
+            sqids_errno);
+        sqids_sqids_failures[j++] = err;
+    }
 
     fputs("\n", stdout);
 

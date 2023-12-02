@@ -1,4 +1,4 @@
-/* generated: 2023-11-29 04:45:08 +0200 */
+/* generated: 2023-12-02 14:37:35 +0200 */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -11,14 +11,14 @@
 #ifdef SQIDS_DEFAULT_BLOCKLIST
 
 #define SQIDS_BL_ADD(bl, s) \
-    if (!sqids_bl_add_tail(bl, s)) { sqids_bl_list_free(bl); return NULL; }
+    if (!sqids_bl_add_tail(bl, s)) { sqids_bl_free(bl); return NULL; }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_de(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -56,12 +56,12 @@ sqids_bl_list_de(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_en(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -173,12 +173,12 @@ sqids_bl_list_en(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_es(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -237,12 +237,12 @@ sqids_bl_list_es(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_fr(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -346,12 +346,12 @@ sqids_bl_list_fr(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_hi(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -397,12 +397,12 @@ sqids_bl_list_hi(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_it(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -614,12 +614,12 @@ sqids_bl_list_it(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_pt(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 
@@ -666,12 +666,12 @@ sqids_bl_list_pt(int (*match_func)(char *, char *))
     return result;
 }
 
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_all(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 

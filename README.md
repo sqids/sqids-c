@@ -22,13 +22,29 @@ You have the option to build it without them by passing `--disable-default-block
 
 Unlike [Hashids](https://github.com/tzvetkoff/hashids.c), Sqids relies heavily on dynamic memory allocation.
 
+You can still override the memory management functions if needed, by reassigning `sqids_mem_alloc`/`sqids_mem_free`.
+
+## Error handling
+
+Sqids defines a thread-safe `sqids_errno` with the following possible values:
+
+| Value                   | Description                                                         |
+| ----------------------- | ------------------------------------------------------------------- |
+| `SQIDS_ERR_ALLOC`       | Memory allocation failed. Generally this means `errno` is `ENOMEM`. |
+| `SQIDS_ERR_ALPHABET`    | Alphabet is too short.                                              |
+| `SQIDS_ERR_MAX_RETRIES` | Max encoding retries reached.                                       |
+| `SQIDS_ERR_INVALID`     | Hash contains invalid characters.                                   |
+| `SQIDS_ERR_OVERFLOW`    | Integer overflow.                                                   |
+
+Keep in mind that you should first test the function result and then inspect `sqids_errno` - if a function succeeds, `sqids_errno` is left untouched.
+
 ## API
 
 ### `sqids_new`
 
 ``` c
 sqids_t *
-sqids_new(char *alphabet, int min_len, sqids_bl_list_t *blocklist)
+sqids_new(char *alphabet, int min_len, sqids_bl_t *blocklist)
 ```
 
 Sqids structure constructor.
@@ -39,6 +55,8 @@ A `NULL` blocklist will result in no blocklist at all.
 See the blocklist API below for further information.
 
 The returned structure should be freed using `sqids_free`.
+
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
 
 ### `sqids_free`
 
@@ -74,7 +92,7 @@ Encode function.
 
 Encodes an array of numbers to a string hash.
 
-The returned string should be freed with `sqids_mem_free` (which defaults to `free`.)
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
 
 ### `sqids_vencode`
 
@@ -85,48 +103,56 @@ sqids_vencode(sqids_t *sqids, unsigned int num_cnt, ...)
 
 Variadic version of `sqids_encode`.
 
-### `sqids_decode`
-
-``` c
-int
-sqids_decode(sqids_t *sqids, char *str, unsigned long long *nums, unsigned int num_max)
-```
-
-Decode function.
-
-Decodes a hash back to numbers while performing limit checking.
-
 ### `sqids_num_cnt`
 
 ``` c
 int
-sqids_num_cnt(sqids_t *sqids, char *str)
+sqids_num_cnt(sqids_t *sqids, char *s)
 ```
 
 Number counting function.
 
 Returns the count of numbers in an hash.
+Keep in mind that this function can return `0` as empty strings are not considered errors.
 
-### `sqids_bl_list_new`
+In case of failure, `-1` is returned and `sqids_errno` is set accordingly.
+
+### `sqids_decode`
 
 ``` c
-sqids_bl_list_t *
-sqids_bl_list_new(int (*match_func)(char *, char *))
+int
+sqids_decode(sqids_t *sqids, char *s, unsigned long long *nums, unsigned int num_max)
+```
+
+Decode function.
+
+Decodes a hash back to numbers.
+Keep in mind that this function can return `0` as empty strings are not considered errors.
+
+Result is the count of numbers decoded in the hash.
+
+In case of failure, `-1` is returned and `sqids_errno` is set accordingly.
+
+### `sqids_bl_new`
+
+``` c
+sqids_bl_t *
+sqids_bl_new(int (*match_func)(char *, char *))
 ```
 
 Blocklist constructor.
 
 Returns a new empty blocklist, which itself is a doubly linked list.
 
-If you pass `NULL` as `match_func`, it will default to `sqids_bl_match_func`.
+If you pass `NULL` as `match_func`, it will default to `sqids_bl_match`.
 
-THe result should be freed with `sqids_bl_list_free`.
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
 
-### `sqids_bl_list_free`
+### `sqids_bl_free`
 
 ``` c
 void
-sqids_bl_list_free(sqids_bl_list_t *list)
+sqids_bl_free(sqids_bl_t *bl)
 ```
 
 Blocklist destructor.
@@ -137,100 +163,74 @@ Frees the blocklist and all its data.
 
 ``` c
 sqids_bl_node_t *
-sqids_bl_add_tail(sqids_bl_list_t *list, char *s)
+sqids_bl_add_tail(sqids_bl_t *bl, char *s)
 ```
 
 Adds a word to the end of the blocklist.
+
+Result is a pointer to the new blocklist node.
+
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
 
 ### `sqids_bl_add_head`
 
 ``` c
 sqids_bl_node_t *
-sqids_bl_add_head(sqids_bl_list_t *list, char *s)
+sqids_bl_add_head(sqids_bl_t *bl, char *s)
 ```
 
 Adds a word to the beginning of the blocklist.
 
-### `sqids_bl_match_func`
+Result is a pointer to the new blocklist node.
+
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
+
+### `sqids_bl_find`
+
+``` c
+sqids_bl_node_t *
+sqids_bl_find(sqids_bl_t *bl, char *s)
+```
+
+Tests if a string matches any of the bad words in the blocklist.
+
+Result is pointer to the matching blocklist node, or `NULL` if no match is found.
+
+### `sqids_bl_match`
 
 ``` c
 int
-sqids_bl_match_func(char *str, char *bad_word)
+sqids_bl_match(char *s, char *bad_word)
 ```
+
+Default blocklist match function.
 
 Tests if a string matches a bad word.
 
-### `sqids_bl_list_all`
+Result is `1` in case of a match, `0` otherwise.
+
+### `sqids_bl_list_*`
 
 ``` c
-sqids_bl_list_t *
-sqids_bl_list_all(int (*match_func)(char *, char *))
+sqids_bl_t *
+sqids_bl_list_LANG(int (*match_func)(char *, char *))
 ```
 
-A default blocklist containing a combination of all the languages below.
+Will either return the combined blocklist of a language-specific one.
+If you pass `NULL` as `match_func`, `sqids_bl_match` will be used as default.
 
-### `sqids_bl_list_de`
+In case of failure, `NULL` is returned and `sqids_errno` is set accordingly.
 
-``` c
-sqids_bl_list_t *
-sqids_bl_list_de(int (*match_func)(char *, char *))
-```
-
-German blocklist.
-
-### `sqids_bl_list_en`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_en(int (*match_func)(char *, char *))
-```
-
-English blocklist.
-
-### `sqids_bl_list_es`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_es(int (*match_func)(char *, char *))
-```
-
-Spanish blocklist.
-
-### `sqids_bl_list_fr`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_fr(int (*match_func)(char *, char *))
-```
-
-French blocklist.
-
-### `sqids_bl_list_hi`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_hi(int (*match_func)(char *, char *))
-```
-
-Hindi blocklist.
-
-### `sqids_bl_list_it`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_it(int (*match_func)(char *, char *))
-```
-
-Italian blocklist.
-
-### `sqids_bl_list_pt`
-
-``` c
-sqids_bl_list_t *
-sqids_bl_list_pt(int (*match_func)(char *, char *))
-```
-
-Portuguese blocklist.
+| Function            | Description                                                                |
+| ------------------- | -------------------------------------------------------------------------- |
+| `sqids_bl_list_all` | The default blocklist, contains all language-specific blocklists combined. |
+| `sqids_bl_list_de`  | German blocklist.                                                          |
+| `sqids_bl_list_en`  | English blocklist.                                                         |
+| `sqids_bl_list_es`  | Spanish blocklist.                                                         |
+| `sqids_bl_list_fr`  | French blocklist.                                                          |
+| `sqids_bl_list_hi`  | Hindi blocklist.                                                           |
+| `sqids_bl_list_it`  | Italian blocklist.                                                         |
+| `sqids_bl_list_pt`  | Portuguese blocklist.                                                      |
 
 ## CLI
 
@@ -288,7 +288,7 @@ Custom blocklist is just as simple:
 ``` c
 #include <sqids.h>
 
-sqids_bl_list_t *bl = sqids_bl_list_new(NULL);
+sqids_bl_t *bl = sqids_bl_new(NULL);
 sqids_bl_add_tail(bl, "86Rf07");
 sqids_t *sqids = sqids_new(SQIDS_DEFAULT_ALPHABET, 0, bl);
 

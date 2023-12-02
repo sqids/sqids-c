@@ -32,7 +32,7 @@ code="/* generated: ${date} */"'
 #ifdef SQIDS_DEFAULT_BLOCKLIST
 
 #define SQIDS_BL_ADD(bl, s) \
-    if (!sqids_bl_add_tail(bl, s)) { sqids_bl_list_free(bl); return NULL; }
+    if (!sqids_bl_add_tail(bl, s)) { sqids_bl_free(bl); return NULL; }
 '
 
 # generate
@@ -47,12 +47,12 @@ for language in "${languages[@]}"; do
 
   # shellcheck disable=SC2016
   code="${code}
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_${name}(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_bl_list_new(match_func))) {
+    if (!(result = sqids_bl_new(match_func))) {
         return NULL;
     }
 "

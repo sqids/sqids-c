@@ -13,71 +13,26 @@
 /* }}}                                                                       */
 
 /*****************************************************************************/
-/* {{{ memory stuff                                                          */
+/* {{{ error handling stuff                                                  */
 /*****************************************************************************/
 
-extern void *(*sqids_mem_alloc)(unsigned int);
-extern void *(*sqids_mem_realloc)(void *, unsigned int);
-extern void (*sqids_mem_free)(void *);
-extern char *(*sqids_mem_strdup)(char *);
+#define SQIDS_ERR_ALLOC         0x01
+#define SQIDS_ERR_ALPHABET      0x02
+#define SQIDS_ERR_MAX_RETRIES   0x03
+#define SQIDS_ERR_INVALID       0x04
+#define SQIDS_ERR_OVERFLOW      0x05
+
+extern int *__sqids_errno_addr(void);
+#define sqids_errno (*__sqids_errno_addr())
 
 /* }}}                                                                       */
 
 /*****************************************************************************/
-/* {{{ string stuff                                                          */
+/* {{{ memory stuff                                                          */
 /*****************************************************************************/
 
-/**
- * dynamic string
- */
-struct sqids_str_s {
-    char *s;
-    int len;
-    int siz;
-};
-typedef struct sqids_str_s sqids_str_t;
-
-/**
- * dynamic string chunk size
- */
-extern int sqids_str_chunk;
-
-/**
- * allocate a new dynamic string
- */
-sqids_str_t *
-sqids_str_new();
-
-/**
- * free a dynamic string
- */
-void
-sqids_str_free(sqids_str_t *);
-
-/**
- * grow a dynamic string to specific size
- */
-int
-sqids_str_grow(sqids_str_t *, int);
-
-/**
- * ensure a dynamic string can hold a certain size, null-terminator included
- */
-int
-sqids_str_cap(sqids_str_t *, int);
-
-
-/**
- * append a char to a dynamic string
- */
-int
-sqids_str_append_char(sqids_str_t *, int);
-
-/**
- * append a string to a dynamic string
- */
-int
-sqids_str_append_str(sqids_str_t *str, char *p);
+extern void *(*sqids_mem_alloc)(unsigned int);
+extern void (*sqids_mem_free)(void *);
 
 /* }}}                                                                       */
 
@@ -98,80 +53,79 @@ typedef struct sqids_bl_node_s sqids_bl_node_t;
 /**
  * blocklist structure
  */
-struct sqids_bl_list_s {
+struct sqids_bl_s {
     sqids_bl_node_t *head;
     sqids_bl_node_t *tail;
     int (*match_func)(char *, char *);
-    unsigned int len;
 };
-typedef struct sqids_bl_list_s sqids_bl_list_t;
+typedef struct sqids_bl_s sqids_bl_t;
 
 /**
  * allocate a new blocklist
  */
-sqids_bl_list_t *
-sqids_bl_list_new(int (*)(char *, char *));
+sqids_bl_t *
+sqids_bl_new(int (*)(char *, char *));
 
 /**
  * free a list and all its data
  */
 void
-sqids_bl_list_free(sqids_bl_list_t *);
+sqids_bl_free(sqids_bl_t *);
 
 /**
  * default blocklist for `de`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_de(int (*)(char *, char *));
 
 /**
  * default blocklist for `en`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_en(int (*)(char *, char *));
 
 /**
  * default blocklist for `es`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_es(int (*)(char *, char *));
 
 /**
  * default blocklist for `fr`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_fr(int (*)(char *, char *));
 
 /**
  * default blocklist for `hi`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_hi(int (*)(char *, char *));
 
 /**
  * default blocklist for `it`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_it(int (*)(char *, char *));
 
 /**
  * default blocklist for `pt`
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_pt(int (*)(char *, char *));
 
 /**
  * default combined blocklist (all contrib languages)
  * if the library was built with --disable-default-blocklist, this will return an empty list
  */
-sqids_bl_list_t *
+sqids_bl_t *
 sqids_bl_list_all(int (*)(char *, char *));
 
 /**
@@ -188,25 +142,25 @@ sqids_bl_list_all(int (*)(char *, char *));
  * add a string at the end of the list
  */
 sqids_bl_node_t *
-sqids_bl_add_tail(sqids_bl_list_t *, char *);
+sqids_bl_add_tail(sqids_bl_t *, char *);
 
 /**
  * add a string at the beginning of the list
  */
 sqids_bl_node_t *
-sqids_bl_add_head(sqids_bl_list_t *, char *);
+sqids_bl_add_head(sqids_bl_t *, char *);
 
 /**
  * search for a string in the list
  */
 sqids_bl_node_t *
-sqids_bl_find(sqids_bl_list_t *, char *);
+sqids_bl_find(sqids_bl_t *, char *);
 
 /**
- * default list search func
+ * default list match function
  */
 int
-sqids_bl_match_func(char *, char *);
+sqids_bl_match(char *, char *);
 
 /* }}}                                                                       */
 
@@ -227,7 +181,7 @@ sqids_bl_match_func(char *, char *);
 struct sqids_s {
     char *alphabet;
     unsigned int min_len;
-    sqids_bl_list_t *blocklist;
+    sqids_bl_t *blocklist;
 };
 typedef struct sqids_s sqids_t;
 
@@ -235,7 +189,7 @@ typedef struct sqids_s sqids_t;
  * allocate a new sqids structure
  */
 sqids_t *
-sqids_new(char *, int, sqids_bl_list_t *);
+sqids_new(char *, unsigned int, sqids_bl_t *);
 
 /**
  * free a sqids structure
@@ -262,16 +216,16 @@ char *
 sqids_vencode(sqids_t *sqids, unsigned int num_cnt, ...);
 
 /**
- * decode
- */
-int
-sqids_decode(sqids_t *, char *, unsigned long long *, unsigned int);
-
-/**
  * numbers count
  */
 int
 sqids_num_cnt(sqids_t *, char *);
+
+/**
+ * decode
+ */
+int
+sqids_decode(sqids_t *, char *, unsigned long long *, unsigned int);
 
 /* }}}                                                                       */
 

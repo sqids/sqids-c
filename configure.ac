@@ -7,7 +7,7 @@ m4_define([SQIDS_BUGREPORT_URL], [https://github.com/sqids/sqids-c/issues])
 m4_define([SQIDS_PROJECT_URL], [https://github.com/sqids/sqids-c])
 
 # Initialize autoconf & automake.
-AC_PREREQ(2.59)
+AC_PREREQ([2.71])
 AC_INIT([sqids], [SQIDS_VERSION_STRING], [SQIDS_BUGREPORT_URL], [sqids], [SQIDS_PROJECT_URL])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_HEADERS([config.h])
@@ -16,9 +16,7 @@ AM_INIT_AUTOMAKE([1.9 foreign])
 
 # Checks for programs.
 AC_PROG_CC()
-AC_PROG_CPP()
 AC_PROG_INSTALL()
-AC_PROG_LN_S()
 AC_PROG_MAKE_SET()
 
 # Libtool.
@@ -27,6 +25,9 @@ LT_INIT()
 # GLibC's math.
 AC_CHECK_LIB([m], [ceil], [LIBM="-lm"])
 AC_SUBST([LIBM])
+
+# Thread-local storage.
+AX_TLS([:], [:])
 
 # Find pkg-config.
 AC_PATH_PROG([PKG_CONFIG], [pkg-config], [no])

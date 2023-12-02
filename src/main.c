@@ -59,11 +59,24 @@ parse_num(const char *s, char **p)
     return strtoull(s, p, radix);
 }
 
+static char *
+sqids_strerror(int e)
+{
+    switch (e) {
+        case SQIDS_ERR_ALLOC:       return "out of memory";
+        case SQIDS_ERR_ALPHABET:    return "alphabet is too short";
+        case SQIDS_ERR_MAX_RETRIES: return "max retries reached";
+        case SQIDS_ERR_INVALID:     return "invalid hash";
+        case SQIDS_ERR_OVERFLOW:    return "integer overflow";
+        default: return "unknown error";
+    }
+}
+
 int
 main(int argc, char **argv)
 {
     sqids_t *sqids;
-    sqids_bl_list_t *blocklist;
+    sqids_bl_t *blocklist;
     char *alphabet = SQIDS_DEFAULT_ALPHABET, *p, *buf;
     int command = COMMAND_ENCODE, min_len = 0, ch, i, j, num_cnt;
 
@@ -80,9 +93,9 @@ main(int argc, char **argv)
     };
 
     /* start with default blocklist */
-    if (!(blocklist = sqids_bl_list_all(sqids_bl_match_func))) {
-        fprintf(stderr, "Could not allocate default blocklist: %s\n",
-            strerror(errno));
+    if (!(blocklist = sqids_bl_list_all(sqids_bl_match))) {
+        fprintf(stderr, "sqids_bl_list_all(): %s\n",
+            sqids_strerror(sqids_errno));
         return EXIT_FAILURE;
     }
 
@@ -100,59 +113,59 @@ main(int argc, char **argv)
                 alphabet = optarg;
                 break;
             case 'l':
-                min_len = strtoul(optarg, &p, 10);
+                min_len = parse_num(optarg, &p);
                 if (p == optarg) {
-                    fprintf(stderr, "Invalid minimum length: %s\n", optarg);
+                    fprintf(stderr, "--min-length: invalid value \"%s\"\n",
+                        optarg);
                     return EXIT_FAILURE;
                 }
                 break;
             case 'b':
                 if (strcmp(optarg, "de") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_de(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_de(sqids_bl_match);
                 } else if (strcmp(optarg, "en") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_en(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_en(sqids_bl_match);
                 } else if (strcmp(optarg, "es") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_es(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_es(sqids_bl_match);
                 } else if (strcmp(optarg, "fr") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_fr(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_fr(sqids_bl_match);
                 } else if (strcmp(optarg, "hi") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_hi(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_hi(sqids_bl_match);
                 } else if (strcmp(optarg, "it") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_it(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_it(sqids_bl_match);
                 } else if (strcmp(optarg, "pt") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_pt(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_pt(sqids_bl_match);
                 } else if (strcmp(optarg, "none") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_new(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_new(sqids_bl_match);
                 } else if (strcmp(optarg, "all") == 0) {
-                    sqids_bl_list_free(blocklist);
-                    blocklist = sqids_bl_list_all(sqids_bl_match_func);
+                    sqids_bl_free(blocklist);
+                    blocklist = sqids_bl_list_all(sqids_bl_match);
                 } else {
-                    fprintf(stderr, "Unknown blocklist value: %s\n", optarg);
+                    fprintf(stderr, "--blocklist: unknown value \"%s\"\n",
+                        optarg);
                     return EXIT_FAILURE;
                 }
 
                 if (!blocklist) {
-                    fprintf(stderr, "Could not allocate user blocklist: %s\n",
-                        strerror(errno));
+                    fprintf(stderr, "sqids_bl_new(): %s\n",
+                        sqids_strerror(sqids_errno));
                     return EXIT_FAILURE;
                 }
 
                 break;
             case 'w':
                 if (!sqids_bl_add_tail(blocklist, optarg)) {
-                    fprintf(stderr, "Could not add word to blocklist: %s\n",
-                        strerror(errno));
-                    if (blocklist) {
-                        sqids_bl_list_free(blocklist);
-                    }
+                    fprintf(stderr, "sqids_bl_add_tail(): %s\n",
+                        sqids_strerror(sqids_errno));
+                    sqids_bl_free(blocklist);
                     return EXIT_FAILURE;
                 }
                 break;
@@ -174,8 +187,9 @@ main(int argc, char **argv)
 
     /* initialize sqids */
     if (!(sqids = sqids_new(alphabet, min_len, blocklist))) {
-        fprintf(stderr, "Could not allocate sqids: %s\n", strerror(errno));
-        sqids_bl_list_free(blocklist);
+        fprintf(stderr, "sqids_new(): %s\n",
+            sqids_strerror(sqids_errno));
+        sqids_bl_free(blocklist);
         return EXIT_FAILURE;
     }
 
@@ -188,7 +202,7 @@ main(int argc, char **argv)
         for (i = 0; i < num_cnt; ++i) {
             nums[i] = parse_num(argv[optind + i], &p);
             if (p == argv[optind + i]) {
-                fprintf(stderr, "Could not parse number: %s\n", argv[i]);
+                fprintf(stderr, "parse_num(%s): error\n", argv[optind + i]);
                 sqids_free(sqids);
                 return EXIT_FAILURE;
             }
@@ -196,8 +210,8 @@ main(int argc, char **argv)
 
         /* encode */
         if (!(buf = sqids_encode(sqids, num_cnt, nums))) {
-            fprintf(stderr, "Could not allocate encoding buffer: %s\n",
-                strerror(errno));
+            fprintf(stderr, "sqids_encode(): %s\n",
+                sqids_strerror(sqids_errno));
             sqids_free(sqids);
             return EXIT_FAILURE;
         }
@@ -208,14 +222,27 @@ main(int argc, char **argv)
     } else if (command == COMMAND_DECODE) {
         /* decode */
         for (i = optind; i < argc; ++i) {
-            if (!(num_cnt = sqids_num_cnt(sqids, argv[i]))) {
-                fprintf(stderr, "Could not parse hash: %s\n", argv[i]);
+            num_cnt = sqids_num_cnt(sqids, argv[i]);
+            if (num_cnt < 0) {
+                fprintf(stderr, "sqids_num_cnt(): %s\n",
+                    sqids_strerror(sqids_errno));
                 sqids_free(sqids);
                 return EXIT_FAILURE;
             }
 
+            if (num_cnt == 0) {
+                continue;
+            }
+
             unsigned long long nums[num_cnt];
             num_cnt = sqids_decode(sqids, argv[i], nums, num_cnt);
+            if (num_cnt < 0) {
+                fprintf(stderr, "sqids_decode(): %s\n",
+                    sqids_strerror(sqids_errno));
+                sqids_free(sqids);
+                return EXIT_FAILURE;
+            }
+
             for (j = 0; j < num_cnt; ++j) {
                 printf("%llu", nums[j]);
                 if (j < num_cnt - 1) {

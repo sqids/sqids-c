@@ -7,10 +7,20 @@
 #include <stdarg.h>
 #include <math.h>
 
-/* only for debugging */
-#include <stdio.h>
-
 #include "sqids.h"
+
+/*****************************************************************************/
+/* {{{ error handling stuff                                                  */
+/*****************************************************************************/
+
+TLS int __sqids_errno_val;
+int *
+__sqids_errno_addr()
+{
+    return &__sqids_errno_val;
+}
+
+/* }}}                                                                       */
 
 /*****************************************************************************/
 /* {{{ memory stuff                                                          */
@@ -20,14 +30,7 @@
 static inline void *
 sqids_mem_alloc_default(unsigned int siz)
 {
-    return calloc(siz, 1);
-}
-
-/* default realloc() implementation */
-static inline void *
-sqids_mem_realloc_default(void *ptr, unsigned int siz)
-{
-    return realloc(ptr, siz);
+    return malloc(siz);
 }
 
 /* default free() implementation */
@@ -37,116 +40,8 @@ sqids_mem_free_default(void *ptr)
     free(ptr);
 }
 
-/* default strdup() implementation */
-static inline char *
-sqids_mem_strdup_default(char *src)
-{
-    return strdup(src);
-}
-
 void *(*sqids_mem_alloc)(unsigned int) = sqids_mem_alloc_default;
-void *(*sqids_mem_realloc)(void *, unsigned int) = sqids_mem_realloc_default;
 void (*sqids_mem_free)(void *) = sqids_mem_free_default;
-char *(*sqids_mem_strdup)(char *) = sqids_mem_strdup_default;
-
-/* }}}                                                                       */
-
-/*****************************************************************************/
-/* {{{ string stuff                                                          */
-/*****************************************************************************/
-
-/* dynamic string chunk size */
-int sqids_str_chunk = 64;
-
-/* allocate a new dynamic string */
-sqids_str_t *
-sqids_str_new() {
-    sqids_str_t *result;
-
-    if (!(result = sqids_mem_alloc(sizeof(sqids_str_t)))) {
-        return NULL;
-    }
-    if (!(result->s = sqids_mem_alloc(sqids_str_chunk))) {
-        sqids_mem_free(result);
-        return NULL;
-    }
-
-    result->siz = sqids_str_chunk;
-
-    return result;
-}
-
-/* free a dynamic string */
-void
-sqids_str_free(sqids_str_t *str)
-{
-    if (str->s) {
-        free(str->s);
-    }
-
-    free(str);
-}
-
-/* grow a dynamic string to specific size */
-int
-sqids_str_grow(sqids_str_t *str, int siz)
-{
-    char *s;
-
-    if (!(s = sqids_mem_realloc(str->s, siz))) {
-        return 0;
-    }
-
-    str->s = s;
-    str->siz = siz;
-    memset(str->s + str->len, 0, siz - str->len - 1);
-
-    return 1;
-}
-
-/* ensure a dynamic string can hold a certain size */
-int
-sqids_str_cap(sqids_str_t *str, int siz)
-{
-    int newsiz;
-
-    if (siz > str->siz) {
-        newsiz = ceil((float)siz / (float)sqids_str_chunk) * sqids_str_chunk;
-        return sqids_str_grow(str, newsiz);
-    }
-
-    return 1;
-}
-
-/* append a char to a dynamic string */
-int
-sqids_str_append_char(sqids_str_t *str, int ch)
-{
-    if (!sqids_str_cap(str, str->len + 4 + 1)) {
-        return 0;
-    }
-
-    str->s[str->len++] = ch;
-
-    return 1;
-}
-
-/* append a string to a dynamic string */
-int
-sqids_str_append_str(sqids_str_t *str, char *p)
-{
-    int len;
-
-    len = strlen(p);
-    if (!sqids_str_cap(str, str->len + len + 1)) {
-        return 0;
-    }
-
-    memcpy(str->s + str->len, p, len + 1);
-    str->len += len;
-
-    return 1;
-}
 
 /* }}}                                                                       */
 
@@ -155,29 +50,33 @@ sqids_str_append_str(sqids_str_t *str, char *p)
 /*****************************************************************************/
 
 /* allocate a new list */
-sqids_bl_list_t *
-sqids_bl_list_new(int (*match_func)(char *, char *))
+sqids_bl_t *
+sqids_bl_new(int (*match_func)(char *, char *))
 {
-    sqids_bl_list_t *result;
+    sqids_bl_t *result;
 
-    if (!(result = sqids_mem_alloc(sizeof(sqids_bl_list_t)))) {
+    if (!(result = sqids_mem_alloc(sizeof(sqids_bl_t)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
     if (!(result->match_func = match_func)) {
-        result->match_func = sqids_bl_match_func;
+        result->match_func = sqids_bl_match;
     }
+
+    result->head = NULL;
+    result->tail = NULL;
 
     return result;
 }
 
 /* free a list and all its data */
 void
-sqids_bl_list_free(sqids_bl_list_t *list)
+sqids_bl_free(sqids_bl_t *bl)
 {
     sqids_bl_node_t *iter, *next;
 
-    sqids_bl_foreach_safe(list->head, iter, next) {
+    sqids_bl_foreach_safe(bl->head, iter, next) {
         if (iter->s) {
             sqids_mem_free(iter->s);
         }
@@ -185,7 +84,7 @@ sqids_bl_list_free(sqids_bl_list_t *list)
         sqids_mem_free(iter);
     }
 
-    sqids_mem_free(list);
+    sqids_mem_free(bl);
 }
 
 #if !defined(SQIDS_DEFAULT_BLOCKLIST) || SQIDS_DEFAULT_BLOCKLIST == 0
@@ -193,127 +92,136 @@ sqids_bl_list_free(sqids_bl_list_t *list)
 sqids_bl_list_t *
 sqids_bl_list_de(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty `en` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_en(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty es` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_es(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty `fr` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_fr(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty `hi` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_hi(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty `it` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_it(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty `pt` blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_pt(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 
 /* empty combined blocklist when compiled with --disable-default-blocklist */
 sqids_bl_list_t *
 sqids_bl_list_all(int (*match_func)(char *, char *))
 {
-    return sqids_bl_list_new(match_func);
+    return sqids_bl_new(match_func);
 }
 #endif
 
 /* add a string at the end of the list */
 sqids_bl_node_t *
-sqids_bl_add_tail(sqids_bl_list_t *list, char *s)
+sqids_bl_add_tail(sqids_bl_t *bl, char *s)
 {
     sqids_bl_node_t *node;
+    int len;
 
     if (!(node = sqids_mem_alloc(sizeof(sqids_bl_node_t)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
-    if (!(node->s = strdup(s))) {
+    len = strlen(s);
+    if (!(node->s = sqids_mem_alloc(len + 1))) {
         sqids_mem_free(node);
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
-    node->prev = list->tail;
+    memcpy(node->s, s, len + 1);
+    node->prev = bl->tail;
     node->next = NULL;
 
     /* assumption: if list->tail != NULL, list->head != NULL */
-    if (list->tail != NULL) {
-        list->tail->next = node;
+    if (bl->tail != NULL) {
+        bl->tail->next = node;
     } else {
-        list->head = node;
+        bl->head = node;
     }
 
-    list->tail = node;
-    ++list->len;
+    bl->tail = node;
 
     return node;
 }
 
 /* add a string at the beginning of the list */
 sqids_bl_node_t *
-sqids_bl_add_head(sqids_bl_list_t *list, char *s)
+sqids_bl_add_head(sqids_bl_t *bl, char *s)
 {
     sqids_bl_node_t *node;
+    int len;
 
     if (!(node = sqids_mem_alloc(sizeof(sqids_bl_node_t)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
-    if (!(node->s = strdup(s))) {
+    len = strlen(s);
+    if (!(node->s = sqids_mem_alloc(len + 1 + 1))) {
+        sqids_mem_free(node);
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
+    memcpy(node->s, s, len);
     node->prev = NULL;
-    node->next = list->head;
+    node->next = bl->head;
 
     /* assumption: if list->head != NULL, list->tail != NULL */
-    if (list->head != NULL) {
-        list->head->prev = node;
+    if (bl->head != NULL) {
+        bl->head->prev = node;
     } else {
-        list->tail = node;
+        bl->tail = node;
     }
 
-    list->head = node;
-    ++list->len;
+    bl->head = node;
 
     return node;
 }
 
 /* search for a string in the list */
 sqids_bl_node_t *
-sqids_bl_find(sqids_bl_list_t *list, char *s)
+sqids_bl_find(sqids_bl_t *bl, char *s)
 {
     sqids_bl_node_t *iter;
-    sqids_bl_foreach(list->head, iter) {
-        if (list->match_func(s, iter->s)) {
+    sqids_bl_foreach(bl->head, iter) {
+        if (bl->match_func(s, iter->s)) {
             return iter;
         }
     }
@@ -323,23 +231,23 @@ sqids_bl_find(sqids_bl_list_t *list, char *s)
 
 /* default list search func */
 int
-sqids_bl_match_func(char *str, char *bad_word)
+sqids_bl_match(char *s, char *bad_word)
 {
-    if (strlen(str) < strlen(bad_word)) {
+    if (strlen(s) < strlen(bad_word)) {
         return 0;
     }
 
-    if (strlen(str) <= 3 || strlen(bad_word) <= 3) {
-        return strcasecmp(str, bad_word) == 0;
+    if (strlen(s) <= 3 || strlen(bad_word) <= 3) {
+        return strcasecmp(s, bad_word) == 0;
     }
 
     if (strpbrk(bad_word, "0123456789")) {
-        return strncasecmp(str, bad_word, strlen(bad_word)) == 0 ||
-            strncasecmp(str + strlen(str) - strlen(bad_word), bad_word,
+        return strncasecmp(s, bad_word, strlen(bad_word)) == 0 ||
+            strncasecmp(s + strlen(s) - strlen(bad_word), bad_word,
                 strlen(bad_word)) == 0;
     }
 
-    return strcasestr(str, bad_word) != NULL;
+    return strcasestr(s, bad_word) != NULL;
 }
 
 /* }}}                                                                       */
@@ -350,11 +258,13 @@ sqids_bl_match_func(char *str, char *bad_word)
 
 /* allocate a new sqids structure */
 sqids_t *
-sqids_new(char *alphabet, int min_len, sqids_bl_list_t *blocklist)
+sqids_new(char *alphabet, unsigned int min_len, sqids_bl_t *blocklist)
 {
     sqids_t *result;
+    int len;
 
     if (!(result = sqids_mem_alloc(sizeof(sqids_t)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
@@ -362,11 +272,20 @@ sqids_new(char *alphabet, int min_len, sqids_bl_list_t *blocklist)
         alphabet = SQIDS_DEFAULT_ALPHABET;
     }
 
-    if (!(result->alphabet = sqids_mem_strdup(alphabet))) {
+    len = strlen(alphabet);
+    if (len < 3) {
         sqids_mem_free(result);
+        sqids_errno = SQIDS_ERR_ALPHABET;
         return NULL;
     }
 
+    if (!(result->alphabet = sqids_mem_alloc(len + 1))) {
+        sqids_mem_free(result);
+        sqids_errno = SQIDS_ERR_ALLOC;
+        return NULL;
+    }
+
+    memcpy(result->alphabet, alphabet, len + 1);
     sqids_shuffle(result->alphabet);
 
     result->min_len = min_len;
@@ -384,7 +303,7 @@ sqids_free(sqids_t *sqids)
     }
 
     if (sqids->blocklist) {
-        sqids_bl_list_free(sqids->blocklist);
+        sqids_bl_free(sqids->blocklist);
     }
 
     sqids_mem_free(sqids);
@@ -406,22 +325,22 @@ sqids_shuffle(char *alphabet)
 
 /* internal encode */
 static inline int
-sqids_encode_internal(sqids_t *sqids, sqids_str_t *str, unsigned int num_cnt,
+sqids_encode_internal(sqids_t *sqids, char *s, unsigned int num_cnt,
     unsigned long long *nums, int increment)
 {
     unsigned long long num;
-    int i, j, ch, len, n, tmp, offset, prefix;
+    int i, j, len, tmp, offset, prefix;
     char *p, *pb;
 
     /* sanity check */
     len = strlen(sqids->alphabet);
     if (increment > len) {
+        sqids_errno = SQIDS_ERR_MAX_RETRIES;
         return 1;
     }
 
     /* get a semi-random offset from input numbers */
-    for (i = 0, offset = num_cnt; i < num_cnt;
-        ++i) {
+    for (i = 0, offset = num_cnt; i < num_cnt; ++i) {
         offset = sqids->alphabet[nums[i] % len] + i + offset;
     }
     offset %= len;
@@ -446,31 +365,23 @@ sqids_encode_internal(sqids_t *sqids, sqids_str_t *str, unsigned int num_cnt,
     }
 
     /* start with prefix */
-    if (!sqids_str_append_char(str, prefix)) {
-        return 1;
-    }
-    p = str->s + str->len;
+    p = s;
+    *p++ = prefix;
 
     /* iterate over numbers and encode each */
     for (i = 0; i < num_cnt; ++i) {
+        /* save current string pointer so we can easily reverse the number */
+        pb = p;
+
         /* encode the number in reverse */
-        n = 0;
         num = nums[i];
         do {
-            ch = alphabet[num % (len - 1) + 1];
-            if (!(sqids_str_append_char(str, ch))) {
-                return 1;
-            }
-            ++n;
+            *p++ = alphabet[num % (len - 1) + 1];
             num /= (len - 1);
         } while (num > 0);
 
-        /* realloc() does not guarantee the same pointer after growing */
-        p = str->s + str->len;
-        pb = p - n;
-
         /* reverse it so we can decode it in the future */
-        for (j = 0; j < n / 2; ++j) {
+        for (j = 0; j < (p - pb) / 2; ++j) {
             tmp = *(pb + j);
             *(pb + j) = *(p - 1 - j);
             *(p - 1 - j) = tmp;
@@ -479,72 +390,87 @@ sqids_encode_internal(sqids_t *sqids, sqids_str_t *str, unsigned int num_cnt,
         /* more numbers to encode - append a separator, shuffle the alphabet */
         if (i < num_cnt - 1) {
             /* the separator is the first character in the current alphabet */
-            if (!sqids_str_append_char(str, alphabet[0])) {
-                return 1;
-            }
-
+            *p++ = alphabet[0];
             sqids_shuffle(alphabet);
         }
     }
 
+    /* ensure a terminator */
+    *p = 0;
+
     /* handle min_len */
-    if (str->len < sqids->min_len) {
+    if (p - s < sqids->min_len) {
         /* append the last separator */
-        if (!sqids_str_append_char(str, alphabet[0])) {
-            return 1;
-        }
+        *p++ = alphabet[0];
 
         /* keep appending separators and alphabet until we're done */
-        while (str->len < sqids->min_len) {
+        while (p - s < sqids->min_len) {
             sqids_shuffle(alphabet);
 
             /* the alphabet has enough material to feed the final id,
                we can safely terminate it */
-            if (sqids->min_len - str->len < len - 1) {
-                alphabet[sqids->min_len - str->len] = 0;
+            if (len - 1 > sqids->min_len - (p - s)) {
+                alphabet[sqids->min_len - (p - s)] = 0;
             }
 
-            if (!sqids_str_append_str(str, alphabet)) {
-                return 1;
+            /* append the alphabet */
+            for (pb = alphabet; *pb; ++pb) {
+                *p++ = *pb;
             }
         }
     }
 
     /* terminate the buffer */
-    if (!sqids_str_append_char(str, 0)) {
-        return 1;
-    }
+    *p = 0;
 
     /* handle bad words */
-    if (sqids->blocklist && sqids_bl_find(sqids->blocklist, str->s)) {
-        memset(str->s, 0, str->siz);
-        str->len = 0;
-        return sqids_encode_internal(sqids, str, num_cnt, nums, increment + 1);
+    if (sqids->blocklist && sqids_bl_find(sqids->blocklist, s)) {
+        return sqids_encode_internal(sqids, s, num_cnt, nums, increment + 1);
     }
 
     return 0;
+}
+
+/* estimate encoded buffer needs */
+static inline int
+sqids_estimate(sqids_t *sqids, unsigned int num_cnt, unsigned long long *nums)
+{
+    int i, result;
+    double log2len = log2(strlen(sqids->alphabet) - 1);
+
+    for (i = 0, result = 0; i < num_cnt; ++i) {
+        switch (nums[i]) {
+            case 0:
+                result += 2;
+                break;
+            case 0xFFFFFFFFFFFFFFFFull:
+                result += ceil(log2(nums[i]) / log2len) + 1;
+                break;
+            default:
+                result += ceil(log2(nums[i] + 1) / log2len) + 1;
+        }
+    }
+
+    return (result > sqids->min_len ? result : sqids->min_len) + 1;
 }
 
 /* encode */
 char *
 sqids_encode(sqids_t *sqids, unsigned int num_cnt, unsigned long long *nums)
 {
-    sqids_str_t *str;
     char *result;
 
-    /* allocate a string buffer */
-    if (!(str = sqids_str_new())) {
+    /* allocate string buffer */
+    if (!(result = sqids_mem_alloc(sqids_estimate(sqids, num_cnt, nums)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
     /* encode */
-    if (sqids_encode_internal(sqids, str, num_cnt, nums, 0) != 0) {
-        sqids_str_free(str);
+    if (sqids_encode_internal(sqids, result, num_cnt, nums, 0) != 0) {
+        sqids_mem_free(result);
         return NULL;
     }
-
-    result = str->s;
-    sqids_mem_free(str);
 
     return result;
 }
@@ -553,16 +479,10 @@ sqids_encode(sqids_t *sqids, unsigned int num_cnt, unsigned long long *nums)
 char *
 sqids_vencode(sqids_t *sqids, unsigned int num_cnt, ...)
 {
-    sqids_str_t *str;
     char *result;
     unsigned long long nums[num_cnt];
     int i;
     va_list ap;
-
-    /* allocate a string buffer */
-    if (!(str = sqids_str_new())) {
-        return NULL;
-    }
 
     /* collect args */
     va_start(ap, num_cnt);
@@ -571,97 +491,42 @@ sqids_vencode(sqids_t *sqids, unsigned int num_cnt, ...)
     }
     va_end(ap);
 
-    /* encode */
-    if (sqids_encode_internal(sqids, str, num_cnt, nums, 0) != 0) {
-        sqids_str_free(str);
+    /* allocate string buffer */
+    if (!(result = sqids_mem_alloc(sqids_estimate(sqids, num_cnt, nums)))) {
+        sqids_errno = SQIDS_ERR_ALLOC;
         return NULL;
     }
 
-    result = str->s;
-    sqids_mem_free(str);
+    /* encode */
+    if (sqids_encode_internal(sqids, result, num_cnt, nums, 0) != 0) {
+        sqids_mem_free(result);
+        return NULL;
+    }
+
     return result;
-}
-
-/* decode */
-int
-sqids_decode(sqids_t *sqids, char *str, unsigned long long *nums,
-    unsigned int num_max)
-{
-    unsigned long long num;
-    int i, j, len, tmp, offset, prefix, separator;
-    char *p;
-
-    /* safety first - scan str for unknown characters */
-    for (i = 0, j = strlen(str); i < j; ++i) {
-        if (!strchr(sqids->alphabet, str[i])) {
-            return 0;
-        }
-    }
-
-    p = str;
-    len = strlen(sqids->alphabet);
-
-    /* extract prefix */
-    prefix = *p++;
-
-    /* determine the offset */
-    offset = strchr(sqids->alphabet, prefix) - sqids->alphabet;
-
-    /* rearrange alphabet back into its original form */
-    char alphabet[len + 1];
-    memcpy(alphabet, sqids->alphabet + offset, len - offset);
-    memcpy(alphabet + len - offset, sqids->alphabet, offset);
-    alphabet[len] = 0;
-
-    /* reverse the internal alphabet */
-    for (j = 0; j < len / 2; ++j) {
-        tmp = alphabet[j];
-        alphabet[j] = alphabet[len - j - 1];
-        alphabet[len - j - 1] = tmp;
-    }
-
-    /* walk the hash */
-    for (i = 0; *p && i < num_max;) {
-        separator = alphabet[0];
-
-        /* empty chunk - we're done */
-        if (*p == separator) {
-            break;
-        }
-
-        /* do parse */
-        num = 0;
-        for (; *p && *p != separator; ++p) {
-            num *= len - 1;
-            num += strchr(alphabet + 1, *p) - alphabet - 1;
-        }
-        nums[i++] = num;
-
-        /* more numbers - shuffle the alphabet */
-        if (*p == separator) {
-            sqids_shuffle(alphabet);
-            ++p;
-        }
-    }
-
-    return i;
 }
 
 /* decode number count */
 int
-sqids_num_cnt(sqids_t *sqids, char *str)
+sqids_num_cnt(sqids_t *sqids, char *s)
 {
     int i, j, len, tmp, offset, prefix, separator;
     char *p;
 
     /* safety first - scan str for unknown characters */
-    for (i = 0, j = strlen(str); i < j; ++i) {
-        if (!strchr(sqids->alphabet, str[i])) {
+    for (i = 0, j = strlen(s); i < j; ++i) {
+        if (!strchr(sqids->alphabet, s[i])) {
+            sqids_errno = SQIDS_ERR_INVALID;
             return 0;
         }
     }
 
-    p = str;
+    /* empty string - no numbers (technically not an error) */
+    if (!j) {
+        return 0;
+    }
+
+    p = s;
     len = strlen(sqids->alphabet);
 
     /* extract prefix */
@@ -695,6 +560,85 @@ sqids_num_cnt(sqids_t *sqids, char *str)
         /* do skip */
         for (; *p && *p != separator; ++p) {}
         ++i;
+
+        /* more numbers - shuffle the alphabet */
+        if (*p == separator) {
+            sqids_shuffle(alphabet);
+            ++p;
+        }
+    }
+
+    return i;
+}
+
+/* decode */
+int
+sqids_decode(sqids_t *sqids, char *s, unsigned long long *nums,
+    unsigned int num_max)
+{
+    unsigned long long num, prev;
+    int i, j, len, tmp, offset, prefix, separator;
+    char *p;
+
+    /* safety first - scan str for unknown characters */
+    for (i = 0, j = strlen(s); i < j; ++i) {
+        if (!strchr(sqids->alphabet, s[i])) {
+            sqids_errno = SQIDS_ERR_INVALID;
+            return -1;
+        }
+    }
+
+    /* empty string - nothing to decode (technically not an error) */
+    if (!j) {
+        return 0;
+    }
+
+    p = s;
+    len = strlen(sqids->alphabet);
+
+    /* extract prefix */
+    prefix = *p++;
+
+    /* determine the offset */
+    offset = strchr(sqids->alphabet, prefix) - sqids->alphabet;
+
+    /* rearrange alphabet back into its original form */
+    char alphabet[len + 1];
+    memcpy(alphabet, sqids->alphabet + offset, len - offset);
+    memcpy(alphabet + len - offset, sqids->alphabet, offset);
+    alphabet[len] = 0;
+
+    /* reverse the internal alphabet */
+    for (j = 0; j < len / 2; ++j) {
+        tmp = alphabet[j];
+        alphabet[j] = alphabet[len - j - 1];
+        alphabet[len - j - 1] = tmp;
+    }
+
+    /* walk the hash */
+    for (i = 0; *p && i < num_max;) {
+        separator = alphabet[0];
+
+        /* empty chunk - we're done */
+        if (*p == separator) {
+            break;
+        }
+
+        /* do parse */
+        num = 0;
+        for (; *p && *p != separator; ++p) {
+            prev = num;
+
+            num *= len - 1;
+            num += strchr(alphabet + 1, *p) - alphabet - 1;
+
+            /* overflow protection */
+            if (num < prev) {
+                sqids_errno = SQIDS_ERR_OVERFLOW;
+                return -1;
+            }
+        }
+        nums[i++] = num;
 
         /* more numbers - shuffle the alphabet */
         if (*p == separator) {

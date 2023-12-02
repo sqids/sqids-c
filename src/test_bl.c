@@ -36,7 +36,7 @@ main(int argc, char **argv)
 {
     int i, j, k, r;
     sqids_bl_test_t *test;
-    sqids_bl_list_t *bl;
+    sqids_bl_t *bl;
     char *err;
 
     for (i = 0, j = 0, k = 0;; ++i) {
@@ -50,7 +50,7 @@ main(int argc, char **argv)
             fputs("\n", stdout);
         }
 
-        bl = sqids_bl_list_new(sqids_bl_match_func);
+        bl = sqids_bl_new(sqids_bl_match);
 
         for (j = 0; test->bad_words[j]; ++j) {
             sqids_bl_add_tail(bl, test->bad_words[j]);
@@ -77,7 +77,7 @@ main(int argc, char **argv)
             sqids_bl_failures[k++] = err;
         }
 
-        sqids_bl_list_free(bl);
+        sqids_bl_free(bl);
     }
 
     fputs("\n", stdout);

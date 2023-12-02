@@ -30,10 +30,7 @@ sqids_LDADD = $(LIBM) libsqids.la
 # Binaries to build & keep.
 #
 
-noinst_PROGRAMS = test_str test_bl test_shuffle test_sqids
-
-test_str_SOURCES = test_str.c
-test_str_LDADD = $(LIBM) libsqids.la
+noinst_PROGRAMS = test_bl test_shuffle test_sqids
 
 test_bl_SOURCES = test_bl.c
 test_bl_LDADD = $(LIBM) libsqids.la
@@ -49,4 +46,4 @@ test_sqids_LDADD = $(LIBM) libsqids.la
 # Tests.
 #
 
-TESTS=test_str test_bl test_shuffle test_sqids
+TESTS=test_bl test_shuffle test_sqids
