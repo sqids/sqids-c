@@ -30,7 +30,8 @@ AC_SUBST([LIBM])
 AX_TLS([:], [:])
 
 # Find pkg-config.
-AC_PATH_PROG([PKG_CONFIG], [pkg-config], [no])
+PKG_PROG_PKG_CONFIG()
+PKG_NOARCH_INSTALLDIR()
 
 # Default blocklist.
 AC_ARG_ENABLE([default-blocklist], AS_HELP_STRING([--enable-default-blocklist], [Enable default blocklist @<:@default=yes@:>@]), [
@@ -58,7 +59,7 @@ AM_CONDITIONAL([SQIDS_DEBUG], [test "x${SQIDS_DEBUG}" = "x1"])
 AC_DEFINE_UNQUOTED([SQIDS_DEBUG], [${SQIDS_DEBUG}], [Debug mode.])
 
 # Makefiles.
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile sqids.pc])
 
 # Le grand finale.
 AC_OUTPUT()

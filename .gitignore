@@ -18,10 +18,12 @@
 
 # Binaries
 /src/sqids
-/src/test_str
 /src/test_bl
 /src/test_shuffle
 /src/test_sqids
+
+# pkgconf
+/sqids.pc
 
 # Autotools and other stuff
 .deps/

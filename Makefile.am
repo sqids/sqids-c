@@ -2,6 +2,7 @@ ACLOCAL_AMFLAGS = -Im4
 
 SUBDIRS = src
 dist_doc_DATA = README.md
+dist_noarch_pkgconfig_DATA = sqids.pc
 
 .PHONY: gen-bl
 gen-bl:
