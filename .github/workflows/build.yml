@@ -1,0 +1,30 @@
+name: Build
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    types:
+    - opened
+    - synchronize
+    - reopened
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y build-essential autoconf automake libtool pkgconf
+
+      - name: Run build-wrapper
+        run: |
+          ./bootstrap
+          ./configure --enable-debug
+          make clean all check
