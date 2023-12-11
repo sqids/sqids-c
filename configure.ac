@@ -1,8 +1,5 @@
 # Define the package version numbers, bug reporting link, project homepage.
-m4_define([SQIDS_VERSION_MAJOR], [0])
-m4_define([SQIDS_VERSION_MINOR], [1])
-m4_define([SQIDS_VERSION_PATCH], [0])
-m4_define([SQIDS_VERSION_STRING], [SQIDS_VERSION_MAJOR.SQIDS_VERSION_MINOR.SQIDS_VERSION_PATCH])
+m4_define([SQIDS_VERSION_STRING], [0.2.0])
 m4_define([SQIDS_BUGREPORT_URL], [https://github.com/sqids/sqids-c/issues])
 m4_define([SQIDS_PROJECT_URL], [https://github.com/sqids/sqids-c])
 
