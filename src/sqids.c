@@ -2,9 +2,9 @@
 #include "config.h"
 #endif
 
-#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <math.h>
 
 #include "sqids.h"
@@ -233,21 +233,28 @@ sqids_bl_find(sqids_bl_t *bl, char *s)
 int
 sqids_bl_match(char *s, char *bad_word)
 {
-    if (strlen(s) < strlen(bad_word)) {
+    int slen = strlen(s), blen = strlen(bad_word);
+
+    if (slen < blen) {
         return 0;
     }
 
-    if (strlen(s) <= 3 || strlen(bad_word) <= 3) {
+    if (slen <= 3 || blen <= 3) {
         return strcasecmp(s, bad_word) == 0;
     }
 
     if (strpbrk(bad_word, "0123456789")) {
-        return strncasecmp(s, bad_word, strlen(bad_word)) == 0 ||
-            strncasecmp(s + strlen(s) - strlen(bad_word), bad_word,
-                strlen(bad_word)) == 0;
+        return strncasecmp(s, bad_word, blen) == 0 ||
+            strncasecmp(s + slen - blen, bad_word, blen) == 0;
     }
 
-    return strcasestr(s, bad_word) != NULL;
+    for (; *s; s++) {
+        if (strncasecmp(s, bad_word, blen) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 /* }}}                                                                       */
